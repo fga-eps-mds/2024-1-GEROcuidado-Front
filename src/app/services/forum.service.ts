@@ -9,12 +9,13 @@ import { IResponse } from "../interfaces/response.interface";
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 const API_PORT = process.env.EXPO_PUBLIC_API_FORUM_PORT;
 const BASE_URL = `${API_URL}:${API_PORT}/api/forum`;
+const CREATE_POST = `${API_URL}:${API_PORT}/api/forum/`;
 
 export const postPublicacao = async (
   body: IPublicacaoBody,
   token: string,
 ): Promise<IResponse<IPublicacao | null>> => {
-  const response = await fetch(BASE_URL, {
+  const response = await fetch(CREATE_POST, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -26,7 +27,7 @@ export const postPublicacao = async (
 
   const json = await response.json();
 
-  if (response.status !== 201) {
+  if (!response.ok) {
     throw new Error(json.message as string);
   }
 

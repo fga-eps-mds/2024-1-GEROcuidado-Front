@@ -15,13 +15,9 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { router } from "expo-router";
-import {
-  IOrder,
-  IRotina,
-  IRotinaFilter,
-} from "../../interfaces/rotina.interface";
-import CardRotina from "../../components/CardRotina";
-import { getAllRotina } from "../../services/rotina.service";
+import { IEvento, IEventoFilter, IOrder } from "../../interfaces/evento.interface";
+import CardEvento from "../../components/CardEvento";
+import { getAllEvento } from "../../services/evento.service";
 import Toast from "react-native-toast-message";
 import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
@@ -30,21 +26,21 @@ import moment from "moment";
 import "moment/locale/pt-br";
 import database from "../../db";
 import { Collection, Q } from "@nozbe/watermelondb";
-import Rotina from "../../model/Rotina";
+import Evento from "../../model/Evento";
 import { getFoto } from "../../shared/helpers/photo.helper";
-import { all } from "axios";
+import { json } from "@nozbe/watermelondb/decorators";
 
-export default function Rotinas() {
+export default function Eventos() {
   moment.locale("pt-br");
 
   const [idoso, setIdoso] = useState<IIdoso>();
   const [user, setUser] = useState<IUser>();
-  const [rotinas, setRotinas] = useState<Rotina[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(moment());
   const order: IOrder = {
-    column: "dataHora",
-    dir: "ASC",
+    field: "dataHora",
+    direction: "asc",
   };
 
   const datesWhitelist = [
@@ -63,9 +59,9 @@ export default function Rotinas() {
     });
   };
 
-  const novaRotina = () => {
+  const novoEvento = () => {
     router.push({
-      pathname: "private/pages/cadastrarRotina",
+      pathname: "private/pages/cadastrarEvento",
     });
   };
 
@@ -76,39 +72,31 @@ export default function Rotinas() {
     });
   };
 
-  const getRotinas = async () => {
-    if (idoso == undefined || !selectedDate) return;
+  const getEventos = async () => {
+    if (!idoso || !selectedDate) return;
 
     setLoading(true);
 
     try {
-      // const rotinaCollection = database.get('rotina') as Collection<Rotina>;
+      const eventoCollection = database.get('evento') as Collection<Evento>;
 
-      // const allIdosoRotinas = await rotinaCollection.query(
-      //   Q.where('idoso_id', idoso.id)
-      // ).fetch();
+      // TODO: Consulta com defeito, arrumar um jeito de filtar com ela
+      /*const eventoFiltrados = await eventoCollection.query(
+        Q.where('idoso_id', idoso.id),
+      ).fetch();*/
 
-      // TODO: tenta fazer essa filtragem direto na query meu nobre
-      // const filteredRotinas = allIdosoRotinas.filter((rotina) => {
-      //   if (rotina.dias.length > 0) {
-      //     const date = selectedDate.toDate();
-      //     const weekday = date.getDay().toString();
+      const todosEventos = await eventoCollection.query().fetch();
 
-      //     return rotina.dias.includes(weekday) && rotina.dataHora < date;
-      //   } else {
-      //     return true;
-      //   }
-      // });
+      const startOfDay = selectedDate.startOf('day').toISOString();
+      const endOfDay = selectedDate.endOf('day').toISOString();
 
-      const allRotinas = await getAllRotina({
-        idIdoso: idoso.id,
-        dataHora: selectedDate.toDate().toString(),
-      }, { column: "dataHora", dir: "ASC" });
+      // Metodo menos eficiente, assim que resolvido deve ser descontinuado
+      const eventosFiltrados = todosEventos.filter(evento => {
+        const eventoDataHora = new Date(evento.dataHora).toISOString(); 
+        return evento.idIdoso === idoso.id && eventoDataHora >= startOfDay && eventoDataHora <= endOfDay;
+      });
 
-      // setRotinas(filteredRotinas);
-
-      if (Array.isArray(allRotinas) && allRotinas.length > 0) setRotinas(allRotinas);
-
+      setEventos(eventosFiltrados);
     } finally {
       setLoading(false);
     }
@@ -124,8 +112,8 @@ export default function Rotinas() {
   useEffect(() => handleUser(), []);
   useEffect(() => getIdoso(), []);
   useEffect(() => {
-    getRotinas()
-  },
+      getEventos();
+    },
     [idoso, selectedDate]
   );
 
@@ -147,7 +135,7 @@ export default function Rotinas() {
           <View>
             <CalendarStrip
               scrollerPaging={true}
-              scrollable={false}
+              scrollable={true}
               style={styles.Calendar}
               calendarHeaderStyle={{ color: "#fff" }}
               dateNumberStyle={{ color: "#fff" }}
@@ -164,9 +152,9 @@ export default function Rotinas() {
             />
           </View>
 
-          <Pressable style={styles.botaoCriarRotina} onPress={novaRotina}>
+          <Pressable style={styles.botaoCriarEvento} onPress={novoEvento}>
             <Icon name="plus" color={"white"} size={20}></Icon>
-            <Text style={styles.textoBotaoCriarRotina}>Nova Rotina</Text>
+            <Text style={styles.textoBotaoCriarEvento}>Novo Evento</Text>
           </Pressable>
 
           {loading && (
@@ -178,13 +166,13 @@ export default function Rotinas() {
             />
           )}
 
-          {!loading && rotinas.length > 0 && (
-            <View style={styles.rotinas}>
+          {!loading && eventos.length > 0 && (
+            <View style={styles.eventos}>
               <FlashList
-                data={rotinas}
+                data={eventos}
                 renderItem={({ item, index }) => (
-                  <CardRotina
-                    item={item as unknown as IRotina & { categoria: string }}
+                  <CardEvento
+                    item={item as unknown as IEvento}
                     index={index}
                     date={selectedDate.toDate() || new Date()}
                   />
@@ -193,11 +181,11 @@ export default function Rotinas() {
               />
             </View>
           )}
-          {rotinas.length === 0 && (
+          {eventos.length === 0 && (
             <View>
               <Text
-                style={styles.semRotinas}
-              >{`Você ainda não tem nenhuma rotina cadastrada no dia ${moment(
+                style={styles.semEventos}
+              >{`Você ainda não tem nenhum evento cadastrado no dia ${moment(
                 selectedDate,
               ).format("DD/MM")}`}</Text>
             </View>
@@ -226,16 +214,6 @@ const styles = StyleSheet.create({
     margin: 0,
     backgroundColor: "#2CCDB5",
   },
-  semFoto: { position: "relative", backgroundColor: "#EFEFF0" },
-  semFotoIcon: {
-    position: "absolute",
-    right: "38%",
-    bottom: "38%",
-    opacity: 0.4,
-    margin: "auto",
-    alignSelf: "center",
-    zIndex: 1,
-  },
   nomeUsuario: {
     color: "#FFFFFF",
     fontSize: 16,
@@ -245,7 +223,7 @@ const styles = StyleSheet.create({
   negrito: {
     fontWeight: "bold",
   },
-  botaoCriarRotina: {
+  botaoCriarEvento: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#B4026D",
@@ -256,17 +234,17 @@ const styles = StyleSheet.create({
     marginRight: 10,
     marginVertical: 10,
   },
-  textoBotaoCriarRotina: {
+  textoBotaoCriarEvento: {
     color: "white",
     fontWeight: "600",
     fontSize: 14,
     marginLeft: 5,
   },
-  rotinas: {
+  eventos: {
     width: Dimensions.get("window").width,
     height: Dimensions.get("window").height,
   },
-  semRotinas: {
+  semEventos: {
     fontSize: 35,
     opacity: 0.3,
     textAlign: "center",
